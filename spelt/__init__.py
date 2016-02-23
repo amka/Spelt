@@ -13,9 +13,12 @@ import logging
 import logging.config
 import sys
 from argparse import ArgumentParser
+from functools import partial
 from getpass import getpass
-from os import path
+from multiprocessing import Pool
+from os import mkdir, path
 
+import requests
 import vk_api
 
 from spelt.picker import Picker
@@ -88,14 +91,90 @@ def get_albums(vk_session):
         return None
 
 
-def process_albums(albums, output):
+def get_album_photos(album_id, offset, vk_session):
+    items = []
+    try:
+        response = vk_session.method('photos.get', values={
+            'owner_id': vk_session.token['user_id'],
+            'album_id': album_id,
+            'offset': offset or 0
+        })
+    except Exception as e:
+        logging.error(e)
+        return items
+
+    if 'items' in response:
+        for item in response['items']:
+            image = {
+                'id': item['id'],
+                'date': datetime.datetime.fromtimestamp(item['date']),
+                'url':
+                    item.get('photo_2560') or
+                    item.get('photo_1280') or
+                    item.get('photo_807') or
+                    item.get('photo_604') or
+                    item.get('photo_130') or
+                    item.get('photo_75')
+            }
+            if item.get('text'):
+                image['title'] = item['text']
+
+            items.append(image)
+
+    return items
+
+
+def download_photo(output, photo):
+    """
+
+    :param photo:
+    :return:
+    """
+    target_filename = '%s%s' % (photo.get('') or photo['id'], path.splitext(photo['url'])[1])
+    photo_filename = path.join(output, target_filename)
+    logger.debug('Begin download image %s to %s', photo['url'], photo_filename)
+    try:
+        r = requests.get(photo['url'], stream=True)
+        with open(photo_filename, 'wb') as fd:
+            for chunk in r.iter_content(8192):
+                fd.write(chunk)
+        logger.debug('Downloaded photo: %s', photo_filename)
+
+    except Exception as e:
+        logger.exception(e)
+        return 0
+
+    return 1
+
+
+def process_albums(albums, output, vk_session):
     """
 
     :param albums:
     :param output:
     :return:
     """
+
     logger.debug('Begin downloads albums: %s', albums)
+    for album in albums:
+        offset = 0
+        logger.debug('Album Size: %s', album['size'])
+        while offset <= album['size']:
+            photo_urls = get_album_photos(album_id=album['id'], offset=offset, vk_session=vk_session)
+            logger.debug('Got URLs for %s photos', len(photo_urls))
+
+            f = partial(download_photo, output)
+            pool = Pool(processes=4)
+            pool.map(f, photo_urls)
+            # And wait till end
+            pool.close()
+            pool.join()
+
+            offset += 1000
+
+
+def update_progress(value):
+    print 'Update Result with %s' % value
 
 
 def run_app(*args, **kwargs):
@@ -130,6 +209,13 @@ def run_app(*args, **kwargs):
     # expand user path if necessary
     if args.output.startswith('~'):
         args.output = path.expanduser(args.output)
+
+    if not path.exists(args.output):
+        try:
+            mkdir(args.output)
+        except Exception as e:
+            logger.exception(e)
+            sys.exit()
     logger.info('Output path is set to: %s', args.output)
 
     start_time = datetime.datetime.now()
@@ -161,9 +247,9 @@ def run_app(*args, **kwargs):
             logger.debug('Adds %s to selection', id_)
 
         selected_albums = [album for album in albums if album['id'] in selected_albums_ids]
-        logger.debug('Selected Albums: %s' % selected_albums)
+        logger.debug('Selected Albums: %s' % [album['title'] for album in selected_albums])
 
-        process_albums(albums=selected_albums, output=args.output)
+        process_albums(albums=selected_albums, output=args.output, vk_session=vk_session)
 
     except KeyboardInterrupt:
         logger.info('Stopped by keyboard')
