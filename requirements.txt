@@ -1,1 +1,2 @@
-vk-api==7.0
+requests == 2.9.1
+vk-api == 7.0

@@ -11,20 +11,24 @@
 import datetime
 import logging
 import logging.config
+import sys
 from argparse import ArgumentParser
 from getpass import getpass
 from os import path
 
-import sys
 import vk_api
+
+from spelt.picker import Picker
 
 __app__ = 'Spelt'
 __author__ = 'Andrey Maksimov <meamka@ya.ru>'
 __date__ = '23.02.16'
 __version__ = '0.1'
 
-if sys.version_info >= (2, 0):
+if sys.version_info >= (3, 0):
     sys.exit('Spelt ask to excuse her, Spelt only work on Pothan 2')
+
+logger = logging.getLogger(__app__)
 
 
 def init_logger():
@@ -33,28 +37,76 @@ def init_logger():
     :return: logger instance
     :rtype: `logging.Logger`
     """
-    logger = logging.getLogger(__app__)
     ch = logging.StreamHandler()
 
     formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)-8s]  %(message)s')
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
-    return logger
 
 
-def main(login, password):
-    vk_api.VkApi(login=login, password=password)
+def main(login, password, output):
+    """Main function that start downloading process
+
+    :param login:
+    :param password:
+    :param output:
+    :return:
+    """
     download_path = path.expanduser('~/Pictures/Spelt')
 
 
-def run_app(*args, **kwargs):
-    logger = init_logger()
+def connect(username, password):
+    """
 
-    if args:
-        logger.debug('Run with args: %s', args)
-    if kwargs:
-        logger.debug('Run with kwargs: %s', kwargs)
+    :param username:
+    :param password:
+    :return:
+    """
+    vk_session = vk_api.VkApi(login=username, password=password)
+    try:
+        vk_session.authorization()
+    except vk_api.AuthorizationError as error_msg:
+        sys.exit(error_msg)
+
+    return vk_session
+
+
+def get_albums(vk_session):
+    """Requests accessible photo albums from VK.
+
+    :param vk_session: `VkApi`
+    :type vk_session: `VkApi`
+    :return: list of albums or None
+    :rtype: list or None
+    """
+    try:
+        vk_response = vk_session.method('photos.getAlbums', values={'owner_id': vk_session.token['user_id']})
+        return vk_response['items']
+    except Exception as e:
+        logging.info("Couldn't get albums. Sorry.")
+        return None
+
+
+def process_albums(albums, output):
+    """
+
+    :param albums:
+    :param output:
+    :return:
+    """
+    logger.debug('Begin downloads albums: %s', albums)
+
+
+def run_app(*args, **kwargs):
+    """
+
+    :param args:
+    :param kwargs:
+    :return:
+    """
+
+    init_logger()
 
     arg_parser = ArgumentParser(
         prog=__app__,
@@ -73,12 +125,12 @@ def run_app(*args, **kwargs):
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
-        logger.debug('Run in verbose mode')
+        logger.info('Run in verbose mode')
 
     # expand user path if necessary
     if args.output.startswith('~'):
         args.output = path.expanduser(args.output)
-        logger.debug('Output path is set to: %s', args.output)
+    logger.info('Output path is set to: %s', args.output)
 
     start_time = datetime.datetime.now()
 
@@ -87,12 +139,39 @@ def run_app(*args, **kwargs):
         password = args.password or getpass("Password (hidden): ")
 
         if not username or not password:
-            print('Not enough auth data')
-            sys.exit(0)
+            logger.info('Not enough auth data')
+            return
+
+        vk_session = connect(username=username, password=password)
+        albums = get_albums(vk_session)
+
+        selected_albums_titles = Picker(
+            title='Select Albums to Process',
+            options=[u'%-50s [ID:%d]' % (album['title'], album['id']) for album in albums]
+        ).get_selected()
+
+        if not selected_albums_titles:
+            logger.info('Nothing to export')
+            return
+
+        selected_albums_ids = []
+        for title in selected_albums_titles:
+            id_ = int(title[title.find("[ID:") + 4:-1])
+            selected_albums_ids.append(id_)
+            logger.debug('Adds %s to selection', id_)
+
+        selected_albums = [album for album in albums if album['id'] in selected_albums_ids]
+        logger.debug('Selected Albums: %s' % selected_albums)
+
+        process_albums(albums=selected_albums, output=args.output)
 
     except KeyboardInterrupt:
-        print('VKPorter exporting stopped by keyboard')
+        logger.info('Stopped by keyboard')
         sys.exit(0)
 
     finally:
-        print("Done in %s" % (datetime.datetime.now() - start_time))
+        logger.info("Done in %s" % (datetime.datetime.now() - start_time))
+
+
+if __name__ == '__main__':
+    run_app()
