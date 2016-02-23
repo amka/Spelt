@@ -81,12 +81,17 @@ def get_albums(vk_session):
         return None
 
 
-def get_album_photos(album_id, offset, vk_session):
+def get_album_photos(album, offset, vk_session):
+
+    def normpath(filename):
+        keepcharacters = [' ', '.', '_', ',']
+        return "".join(c for c in filename if c.isalnum() or c in keepcharacters).rstrip()
+
     items = []
     try:
         response = vk_session.method('photos.get', values={
             'owner_id': vk_session.token['user_id'],
-            'album_id': album_id,
+            'album_id': album['id'],
             'offset': offset or 0
         })
     except Exception as e:
@@ -107,7 +112,7 @@ def get_album_photos(album_id, offset, vk_session):
                     item.get('photo_75')
             }
             if item.get('text'):
-                image['title'] = item['text']
+                image['title'] = normpath(item['text'])
 
             items.append(image)
 
@@ -120,9 +125,9 @@ def download_photo(output, photo):
     :param photo:
     :return:
     """
-    target_filename = '%s%s' % (photo.get('') or photo['id'], path.splitext(photo['url'])[1])
+    target_filename = u'%s%s' % (photo.get('title') or photo['id'], path.splitext(photo['url'])[1])
     photo_filename = path.join(output, target_filename)
-    logger.debug('Begin download image %s to %s', photo['url'], photo_filename)
+    logger.debug(u'Begin download image %s to %s', photo['url'], photo_filename)
     try:
         r = requests.get(photo['url'], stream=True)
         with open(photo_filename, 'wb') as fd:
@@ -148,13 +153,17 @@ def process_albums(albums, output, vk_session):
     logger.info('Begin downloading %s album(s)', len(albums))
     for album in albums:
         offset = 0
+        album_folder = path.join(output, album['title'])
+        if not path.exists(album_folder):
+            mkdir(album_folder)
+
         logger.debug('Album Size: %s', album['size'])
         while offset <= album['size']:
-            photo_urls = get_album_photos(album_id=album['id'], offset=offset, vk_session=vk_session)
+            photo_urls = get_album_photos(album=album, offset=offset, vk_session=vk_session)
             logger.debug('Got URLs for %s photo(s)', len(photo_urls))
 
-            f = partial(download_photo, output)
-            pool = Pool(processes=5)
+            f = partial(download_photo, album_folder)
+            pool = Pool(processes=8)
             pool.map_async(f, photo_urls)
             # And wait till end
             pool.close()
@@ -162,7 +171,7 @@ def process_albums(albums, output, vk_session):
 
             offset += 1000
 
-        logger.info(u'Album "%s" downloaded.', album['title'])
+        logger.info(u'Album "%s" [%d] downloaded.', album['title'], album['size'])
 
     logger.info('%d photo(s) downloaded.' % sum([album['size'] for album in albums]))
 
@@ -235,7 +244,7 @@ def run_app():
             logger.debug('Adds %s to selection', id_)
 
         selected_albums = [album for album in albums if album['id'] in selected_albums_ids]
-        logger.debug('Selected Albums: %s' % [album['title'] for album in selected_albums])
+        logger.debug(u'Selected Albums: %s' % [u'%s' % album['title'] for album in selected_albums])
 
         process_albums(albums=selected_albums, output=args.output, vk_session=vk_session)
 
