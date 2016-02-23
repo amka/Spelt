@@ -46,17 +46,7 @@ def init_logger():
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
-
-
-def main(login, password, output):
-    """Main function that start downloading process
-
-    :param login:
-    :param password:
-    :param output:
-    :return:
-    """
-    download_path = path.expanduser('~/Pictures/Spelt')
+    logger.setLevel(logging.INFO)
 
 
 def connect(username, password):
@@ -155,16 +145,16 @@ def process_albums(albums, output, vk_session):
     :return:
     """
 
-    logger.debug('Begin downloads albums: %s', albums)
+    logger.info('Begin downloading %s album(s)', len(albums))
     for album in albums:
         offset = 0
         logger.debug('Album Size: %s', album['size'])
         while offset <= album['size']:
             photo_urls = get_album_photos(album_id=album['id'], offset=offset, vk_session=vk_session)
-            logger.debug('Got URLs for %s photos', len(photo_urls))
+            logger.debug('Got URLs for %s photo(s)', len(photo_urls))
 
             f = partial(download_photo, output)
-            pool = Pool(processes=4)
+            pool = Pool(processes=5)
             pool.map_async(f, photo_urls)
             # And wait till end
             pool.close()
@@ -172,16 +162,14 @@ def process_albums(albums, output, vk_session):
 
             offset += 1000
 
+        logger.info(u'Album "%s" downloaded.', album['title'])
 
-def update_progress(value):
-    print 'Update Result with %s' % value
+    logger.info('%d photo(s) downloaded.' % sum([album['size'] for album in albums]))
 
 
-def run_app(*args, **kwargs):
+def run_app():
     """
 
-    :param args:
-    :param kwargs:
     :return:
     """
 
@@ -196,7 +184,7 @@ def run_app(*args, **kwargs):
 
     arg_parser.add_argument('--username', '-U', help='vk.com username')
     arg_parser.add_argument('--password', '-P', help='vk.com password')
-    arg_parser.add_argument('--output', '-o', help='output path to store photos. Defaults to current directory.',
+    arg_parser.add_argument('--output', '-O', help='output path to store photos. Defaults to current directory.',
                             default=path.abspath(path.join(path.dirname(__file__), 'Spelt')))
     arg_parser.add_argument('--verbose', help='enable verbose mode', action='store_true')
 
