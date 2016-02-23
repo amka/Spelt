@@ -165,7 +165,7 @@ def process_albums(albums, output, vk_session):
 
             f = partial(download_photo, output)
             pool = Pool(processes=4)
-            pool.map(f, photo_urls)
+            pool.map_async(f, photo_urls)
             # And wait till end
             pool.close()
             pool.join()
