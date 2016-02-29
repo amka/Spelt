@@ -36,9 +36,8 @@ logger = logging.getLogger(__app__)
 
 def init_logger():
     """Initialize logger instance for app. Default to INFO level.
+    `logger` object have to be initialized before calling this function.
 
-    :return: logger instance
-    :rtype: `logging.Logger`
     """
     ch = logging.StreamHandler()
 
@@ -50,11 +49,16 @@ def init_logger():
 
 
 def connect(username, password):
-    """
+    """Try to connect to VK.com and authenticate with given credentials.
+    If it's OK return instance of :class:`vk_api.VkApi`.
+    If it's not then call `sys.exit()`.
 
-    :param username:
-    :param password:
-    :return:
+    :param username: VK username
+    :type username: str
+    :param password: VK username password
+    :type password: str
+    :return: None of :class:`vk_api.VkApi`
+    :rtype: None or :class:`vk_api.VkApi`
     """
     vk_session = vk_api.VkApi(login=username, password=password)
     try:
@@ -82,6 +86,16 @@ def get_albums(vk_session):
 
 
 def get_album_photos(album, offset, vk_session):
+    """Retrieves list of photos within given album from VK.com
+
+    :param album:
+    :type album: str
+    :param offset:
+    :type offset: int or None
+    :param vk_session: instance of :class:`vk_api.VkApi`
+    :type vk_session: :class:`vk_api.VkApi`
+    :return:
+    """
 
     def normpath(filename):
         keepcharacters = [' ', '.', '_', ',']
@@ -120,10 +134,20 @@ def get_album_photos(album, offset, vk_session):
 
 
 def download_photo(output, photo):
-    """
+    """Download single image from VK.com to given folder.
+    `photo` objects have to be similar to:
 
-    :param photo:
-    :return:
+        {
+            'id': 13176195,
+            'url': 'http://vk.com/…',
+            'title': 'My Lovely Photo'
+        }
+
+    :param output: path to download folder
+    :type output: str
+    :param photo: dict containing vk photo information
+    :type photo: dict
+    :return: 0 if errors, 1 if OK.
     """
     target_filename = u'%s%s' % (photo.get('title') or photo['id'], path.splitext(photo['url'])[1])
     photo_filename = path.join(output, target_filename)
@@ -143,7 +167,7 @@ def download_photo(output, photo):
 
 
 def process_albums(albums, output, vk_session):
-    """
+    """Init download processes in separated processes with multiprocessing.
 
     :param albums:
     :param output:
@@ -177,9 +201,8 @@ def process_albums(albums, output, vk_session):
 
 
 def run_app():
-    """
+    """Main function. Init app, parse input and call download methods.
 
-    :return:
     """
 
     init_logger()
