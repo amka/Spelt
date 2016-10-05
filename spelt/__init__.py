@@ -80,7 +80,7 @@ def get_albums(vk_session):
     try:
         vk_response = vk_session.method('photos.getAlbums', values={'owner_id': vk_session.token['user_id']})
         return vk_response['items']
-    except Exception as e:
+    except Exception:
         logging.info("Couldn't get albums. Sorry.")
         return None
 
