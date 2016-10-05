@@ -211,7 +211,6 @@ def run_app():
         prog=__app__,
         description='Spelt is a small python application aimed to allow users '
                     'to backup their photo from https://vk.com to local storage',
-        version=__version__
     )
 
     arg_parser.add_argument('--username', '-U', help='vk.com username')
