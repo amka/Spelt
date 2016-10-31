@@ -1,10 +1,8 @@
 from distutils.core import setup
 
-import spelt
-
 setup(
     name='Spelt',
-    version=spelt.__version__,
+    version='0.1',
     packages=['spelt'],
     url='https://github.com/amka/spelt',
     license='MIT',
@@ -15,4 +13,8 @@ setup(
     entry_points={
         'console_scripts': ['spelt=spelt.__init__:run_app'],
     },
+    install_requires=[
+        'requests',
+        'vk-api',
+    ],
 )
