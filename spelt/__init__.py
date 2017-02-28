@@ -149,8 +149,18 @@ def download_photo(output, photo):
     :type photo: dict
     :return: 0 if errors, 1 if OK.
     """
-    target_filename = u'%s%s' % (photo.get('title') or photo['id'], path.splitext(photo['url'])[1])
+
+    # to keep neuteral order and avoid overwriting when few photos have the same description
+    basename = u'%s%s' % (photo['id'],  u'_' + photo.get('title') if photo.get('title') else '')
+    # Filesystem naming limitation to avoid error 255 bytes for ext3,ext4
+    if sys.getsizeof(basename) > 245:
+        basename = photo['id']
+
+    target_filename = u'%s%s' % (basename, path.splitext(photo['url'])[1])
     photo_filename = path.join(output, target_filename)
+    if path.isfile(photo_filename):
+        logger.debug(u'Image %s already exist. Skipped.', basename)
+        return 1
     logger.debug(u'Begin download image %s to %s', photo['url'], photo_filename)
     try:
         r = requests.get(photo['url'], stream=True)
