@@ -23,6 +23,8 @@ import vk_api
 
 from spelt.picker import Picker
 
+USER_PHOTOS_ALBUM_ID = -9999999
+
 __app__ = 'Spelt'
 __author__ = 'Andrey Maksimov <meamka@ya.ru>'
 __date__ = '23.02.16'
@@ -78,11 +80,23 @@ def get_albums(vk_session):
     :rtype: list or None
     """
     try:
-        vk_response = vk_session.method('photos.getAlbums', values={'owner_id': vk_session.token['user_id']})
+        vk_response = vk_session.method('photos.getAlbums', values={'owner_id': vk_session.token['user_id'], 'need_system': 1})
         return vk_response['items']
     except Exception:
         logging.info("Couldn't get albums. Sorry.")
         return None
+
+
+def get_user_photos_album(vk_session):
+    """Requests information about user photos from VK.
+
+        :param vk_session: `VkApi`
+        :type vk_session: `VkApi`
+        :return: dict user photos virtual album
+        :rtype: dict
+        """
+    vk_response = vk_session.method('photos.getUserPhotos', values={'user_id': vk_session.token['user_id']})
+    return {'title': 'Photos with me', 'id': USER_PHOTOS_ALBUM_ID, 'size': vk_response['count']}
 
 
 def get_album_photos(album, offset, vk_session):
@@ -103,11 +117,18 @@ def get_album_photos(album, offset, vk_session):
 
     items = []
     try:
-        response = vk_session.method('photos.get', values={
-            'owner_id': vk_session.token['user_id'],
-            'album_id': album['id'],
-            'offset': offset or 0
-        })
+        if USER_PHOTOS_ALBUM_ID == album['id']:
+            response = vk_session.method('photos.getUserPhotos', values={
+                'user_id': vk_session.token['user_id'],
+                'count': 1000,
+                'offset': offset or 0
+            })
+        else:
+            response = vk_session.method('photos.get', values={
+                'owner_id': vk_session.token['user_id'],
+                'album_id': album['id'],
+                'offset': offset or 0
+            })
     except Exception as e:
         logging.error(e)
         return items
@@ -259,10 +280,11 @@ def run_app():
 
         vk_session = connect(username=username, password=password)
         albums = get_albums(vk_session)
+        albums.insert(0, get_user_photos_album(vk_session))
 
         selected_albums_titles = Picker(
             title='Select Albums to Process',
-            options=[u'%-50s [ID:%d]' % (album['title'], album['id']) for album in albums]
+            options=[u'%-45s %5d [ID:%d]' % (album['title'], album['size'], album['id']) for album in albums]
         ).get_selected()
 
         if not selected_albums_titles:
