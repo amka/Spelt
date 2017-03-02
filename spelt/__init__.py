@@ -80,7 +80,10 @@ def get_albums(vk_session):
     :rtype: list or None
     """
     try:
-        vk_response = vk_session.method('photos.getAlbums', values={'owner_id': vk_session.token['user_id'], 'need_system': 1})
+        vk_response = vk_session.method(
+            'photos.getAlbums',
+            values={'owner_id': vk_session.token['user_id'], 'need_system': 1}
+        )
         return vk_response['items']
     except Exception:
         logging.info("Couldn't get albums. Sorry.")
@@ -95,7 +98,10 @@ def get_user_photos_album(vk_session):
         :return: dict user photos virtual album
         :rtype: dict
         """
-    vk_response = vk_session.method('photos.getUserPhotos', values={'user_id': vk_session.token['user_id']})
+    vk_response = vk_session.method(
+        'photos.getUserPhotos',
+        values={'user_id': vk_session.token['user_id']}
+    )
     return {'title': 'Photos with me', 'id': USER_PHOTOS_ALBUM_ID, 'size': vk_response['count']}
 
 
@@ -284,7 +290,8 @@ def run_app():
 
         selected_albums_titles = Picker(
             title='Select Albums to Process',
-            options=[u'%-45s %5d [ID:%d]' % (album['title'], album['size'], album['id']) for album in albums]
+            options=[u'%-45s %5d [ID:%d]' % (album['title'], album['size'], album['id']) for album
+                     in albums]
         ).get_selected()
 
         if not selected_albums_titles:
