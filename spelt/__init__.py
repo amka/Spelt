@@ -64,8 +64,8 @@ def connect(username, password):
     """
     vk_session = vk_api.VkApi(login=username, password=password)
     try:
-        vk_session.authorization()
-    except vk_api.AuthorizationError as error_msg:
+        vk_session.auth()
+    except vk_api.AuthError as error_msg:
         sys.exit(error_msg)
 
     return vk_session
