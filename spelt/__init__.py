@@ -16,7 +16,7 @@ from argparse import ArgumentParser
 from functools import partial
 from getpass import getpass
 from multiprocessing import Pool
-from os import mkdir, path
+from os import mkdir, path, getcwd
 
 import requests
 import vk_api
@@ -253,7 +253,7 @@ def run_app():
     arg_parser.add_argument('--username', '-U', help='vk.com username')
     arg_parser.add_argument('--password', '-P', help='vk.com password')
     arg_parser.add_argument('--output', '-O', help='output path to store photos. Defaults to current directory.',
-                            default=path.abspath(path.join(path.dirname(__file__), 'Spelt')))
+                            default=path.abspath(path.join(getcwd(), 'Spelt')))
     arg_parser.add_argument('--verbose', help='enable verbose mode', action='store_true')
 
     args = arg_parser.parse_args()
