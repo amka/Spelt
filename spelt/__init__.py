@@ -21,7 +21,6 @@ from os import mkdir, path, getcwd
 import requests
 import vk_api
 
-from spelt.picker import Picker
 
 USER_PHOTOS_ALBUM_ID = -9999999
 
@@ -30,10 +29,7 @@ __author__ = 'Andrey Maksimov <meamka@ya.ru>'
 __date__ = '23.02.16'
 __version__ = '0.1'
 
-if sys.version_info >= (3, 0):
-    sys.exit('Spelt ask to excuse her, Spelt only work on Pothan 2')
-
-logger = logging.getLogger(__app__)
+LOGGER = logging.getLogger(__app__)
 
 
 def init_logger():
@@ -43,11 +39,12 @@ def init_logger():
     """
     ch = logging.StreamHandler()
 
-    formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)-8s]  %(message)s')
+    formatter = logging.Formatter(
+        '[%(asctime)s][%(name)s][%(levelname)-8s]  %(message)s')
     ch.setFormatter(formatter)
 
-    logger.addHandler(ch)
-    logger.setLevel(logging.INFO)
+    LOGGER.addHandler(ch)
+    LOGGER.setLevel(logging.INFO)
 
 
 def connect(username, password):
@@ -64,8 +61,8 @@ def connect(username, password):
     """
     vk_session = vk_api.VkApi(login=username, password=password)
     try:
-        vk_session.authorization()
-    except vk_api.AuthorizationError as error_msg:
+        vk_session.auth()
+    except vk_api.AuthError as error_msg:
         sys.exit(error_msg)
 
     return vk_session
@@ -85,8 +82,9 @@ def get_albums(vk_session):
             values={'owner_id': vk_session.token['user_id'], 'need_system': 1}
         )
         return vk_response['items']
-    except Exception:
+    except Exception as e:
         logging.info("Couldn't get albums. Sorry.")
+        LOGGER.debug(e.message)
         return None
 
 
@@ -108,16 +106,22 @@ def get_user_photos_album(vk_session):
 def get_album_photos(album, offset, vk_session):
     """Retrieves list of photos within given album from VK.com
 
-    :param album:
-    :type album: str
-    :param offset:
+    :param album: VKontakte album object
+    :type album: dict
+    :param offset: Offset needed to return a specific subset of photos. By default, 0.
     :type offset: int or None
     :param vk_session: instance of :class:`vk_api.VkApi`
     :type vk_session: :class:`vk_api.VkApi`
-    :return:
+    :return: Returns a list of photo objects
     """
 
     def normpath(filename):
+        """Normalize filename by removing unacceptable chars
+
+        :param filename: file name
+        :type filename: str
+        :rtype: str
+        """
         keepcharacters = [' ', '.', '_', ',']
         return "".join(c for c in filename if c.isalnum() or c in keepcharacters).rstrip()
 
@@ -178,7 +182,8 @@ def download_photo(output, photo):
     """
 
     # to keep neuteral order and avoid overwriting when few photos have the same description
-    basename = u'%s%s' % (photo['id'],  u'_' + photo.get('title') if photo.get('title') else '')
+    basename = u'%s%s' % (
+        photo['id'], u'_' + photo.get('title') if photo.get('title') else '')
     # Filesystem naming limitation to avoid error 255 bytes for ext3,ext4
     if sys.getsizeof(basename) > 245:
         basename = photo['id']
@@ -186,18 +191,19 @@ def download_photo(output, photo):
     target_filename = u'%s%s' % (basename, path.splitext(photo['url'])[1])
     photo_filename = path.join(output, target_filename)
     if path.isfile(photo_filename):
-        logger.debug(u'Image %s already exist. Skipped.', basename)
+        LOGGER.debug(u'Image %s already exist. Skipped.', basename)
         return 1
-    logger.debug(u'Begin download image %s to %s', photo['url'], photo_filename)
+    LOGGER.debug(u'Begin download image %s to %s',
+                 photo['url'], photo_filename)
     try:
-        r = requests.get(photo['url'], stream=True)
+        resp = requests.get(photo['url'], stream=True)
         with open(photo_filename, 'wb') as fd:
-            for chunk in r.iter_content(8192):
+            for chunk in resp.iter_content(8192):
                 fd.write(chunk)
-        logger.debug('Downloaded photo: %s', photo_filename)
+        LOGGER.debug('Downloaded photo: %s', photo_filename)
 
     except Exception as e:
-        logger.exception(e)
+        LOGGER.exception(e)
         return 0
 
     return 1
@@ -211,30 +217,33 @@ def process_albums(albums, output, vk_session):
     :return:
     """
 
-    logger.info('Begin downloading %s album(s)', len(albums))
+    LOGGER.info('Begin downloading %s album(s)', len(albums))
     for album in albums:
         offset = 0
         album_folder = path.join(output, album['title'])
         if not path.exists(album_folder):
             mkdir(album_folder)
 
-        logger.debug('Album Size: %s', album['size'])
+        LOGGER.debug('Album Size: %s', album['size'])
         while offset <= album['size']:
-            photo_urls = get_album_photos(album=album, offset=offset, vk_session=vk_session)
-            logger.debug('Got URLs for %s photo(s)', len(photo_urls))
+            photo_urls = get_album_photos(
+                album=album, offset=offset, vk_session=vk_session)
+            LOGGER.debug('Got URLs for %s photo(s)', len(photo_urls))
 
-            f = partial(download_photo, album_folder)
+            func = partial(download_photo, album_folder)
             pool = Pool(processes=8)
-            pool.map_async(f, photo_urls)
+            pool.map_async(func, photo_urls)
             # And wait till end
             pool.close()
             pool.join()
 
             offset += 1000
 
-        logger.info(u'Album "%s" [%d] downloaded.', album['title'], album['size'])
+        LOGGER.info(u'Album "%s" [%d] downloaded.',
+                    album['title'], album['size'])
 
-    logger.info('%d photo(s) downloaded.' % sum([album['size'] for album in albums]))
+    LOGGER.info('%d photo(s) downloaded.', sum(
+        [album['size'] for album in albums]))
 
 
 def run_app():
@@ -252,15 +261,17 @@ def run_app():
 
     arg_parser.add_argument('--username', '-U', help='vk.com username')
     arg_parser.add_argument('--password', '-P', help='vk.com password')
-    arg_parser.add_argument('--output', '-O', help='output path to store photos. Defaults to current directory.',
-                            default=path.abspath(path.join(getcwd(), 'Spelt')))
-    arg_parser.add_argument('--verbose', help='enable verbose mode', action='store_true')
+    arg_parser.add_argument('--output', '-O', default=path.abspath(path.join(getcwd(), 'Spelt')),
+                            help='output path to store photos. Defaults to current directory.')
+
+    arg_parser.add_argument(
+        '--verbose', help='enable verbose mode', action='store_true')
 
     args = arg_parser.parse_args()
 
     if args.verbose:
-        logger.setLevel(logging.DEBUG)
-        logger.info('Run in verbose mode')
+        LOGGER.setLevel(logging.DEBUG)
+        LOGGER.info('Run in verbose mode')
 
     # expand user path if necessary
     if args.output.startswith('~'):
@@ -270,9 +281,9 @@ def run_app():
         try:
             mkdir(args.output)
         except Exception as e:
-            logger.exception(e)
+            LOGGER.exception(e)
             sys.exit()
-    logger.info('Output path is set to: %s', args.output)
+    LOGGER.info('Output path is set to: %s', args.output)
 
     start_time = datetime.datetime.now()
 
@@ -281,40 +292,46 @@ def run_app():
         password = args.password or getpass("Password (hidden): ")
 
         if not username or not password:
-            logger.info('Not enough auth data')
+            LOGGER.info('Not enough auth data')
             return
 
         vk_session = connect(username=username, password=password)
         albums = get_albums(vk_session)
         albums.insert(0, get_user_photos_album(vk_session))
 
-        selected_albums_titles = Picker(
-            title='Select Albums to Process',
-            options=[u'%-45s %5d [ID:%d]' % (album['title'], album['size'], album['id']) for album
-                     in albums]
-        ).get_selected()
+        LOGGER.info('Found these Albums:')
+        for album_index, album in enumerate(albums):
+            LOGGER.info('%3d. %-45s [Photos: %5d] [ID:%d]',
+                        album_index, album['title'], album['size'], album['id'])
 
-        if not selected_albums_titles:
-            logger.info('Nothing to export')
+
+        msg = 'Enter space-separated album numbers to proceed: '
+        if sys.version_info[0] < 3:
+            selected_albums_indexes = raw_input(msg)
+        else:
+            selected_albums_indexes = input(msg)
+
+        if not selected_albums_indexes:
+            LOGGER.info('Nothing to export')
             return
 
-        selected_albums_ids = []
-        for title in selected_albums_titles:
-            id_ = int(title[title.find("[ID:") + 4:-1])
-            selected_albums_ids.append(id_)
-            logger.debug('Adds %s to selection', id_)
+        selected_albums = []
+        for index in selected_albums_indexes.split():
+            try:
+                selected_albums.append(albums[int(index)])
+            except (ValueError, TypeError):
+                LOGGER.info('Skipped value: %s', index)
 
-        selected_albums = [album for album in albums if album['id'] in selected_albums_ids]
-        logger.debug(u'Selected Albums: %s' % [u'%s' % album['title'] for album in selected_albums])
+        LOGGER.debug(u'Selected Albums: %s', [u'%s' % album['title'] for album in selected_albums])
 
         process_albums(albums=selected_albums, output=args.output, vk_session=vk_session)
 
     except KeyboardInterrupt:
-        logger.info('Stopped by keyboard')
+        LOGGER.info('Stopped by keyboard')
         sys.exit(0)
 
     finally:
-        logger.info("Done in %s" % (datetime.datetime.now() - start_time))
+        LOGGER.info("Done in %s", (datetime.datetime.now() - start_time))
 
 
 if __name__ == '__main__':

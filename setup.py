@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='Spelt',
-    version='0.1',
+    version='0.2',
     packages=['spelt'],
     url='https://github.com/amka/spelt',
     license='MIT',
@@ -14,7 +14,6 @@ setup(
         'console_scripts': ['spelt=spelt.__init__:run_app'],
     },
     install_requires=[
-        'requests',
-        'vk-api',
+        'vk_api',
     ],
 )
