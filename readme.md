@@ -8,6 +8,9 @@ to allow users to backup their photo from https://vk.com to local storage.
 
 It's made as reincarnation of [VKPorter](https://github.com/amka/VKPorter/)
 
+## Run on Windows
+Note that Python for Winows doesn't have `curses` module, so it cannot run Spelt.
+
 
 ## Installation
 
