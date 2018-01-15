@@ -180,7 +180,7 @@ def download_photo(output, photo):
     if sys.getsizeof(basename) > 245:
         basename = photo['id']
 
-    target_filename = u'%s%s' % (basename, path.splitext(photo['url'])[1])
+    target_filename = escape_path(u'%s%s' % (basename, path.splitext(photo['url'])[1]))
     photo_filename = path.join(output, target_filename)
     if path.isfile(photo_filename):
         logger.debug(u'Image %s already exist. Skipped.', basename)
@@ -211,7 +211,7 @@ def process_albums(albums, output, vk_session):
     logger.info('Begin downloading %s album(s)', len(albums))
     for album in albums:
         offset = 0
-        album_folder = path.join(output, album['title'])
+        album_folder = path.join(output, escape_path(album['title']))
         if not path.exists(album_folder):
             mkdir(album_folder)
 
@@ -232,6 +232,11 @@ def process_albums(albums, output, vk_session):
         logger.info(u'Album "%s" [%d] downloaded.', album['title'], album['size'])
 
     logger.info('%d photo(s) downloaded.' % sum([album['size'] for album in albums]))
+
+def escape_path(path):
+    if path:
+        return path.replace('/', '_')
+    return path
 
 
 def run_app():
