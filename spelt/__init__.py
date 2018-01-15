@@ -27,11 +27,8 @@ USER_PHOTOS_ALBUM_ID = -9999999
 
 __app__ = 'Spelt'
 __author__ = 'Andrey Maksimov <meamka@ya.ru>'
-__date__ = '23.02.16'
-__version__ = '0.1'
-
-if sys.version_info >= (3, 0):
-    sys.exit('Spelt ask to excuse her, Spelt only work on Pothan 2')
+__date__ = '15.01.18'
+__version__ = '0.2'
 
 logger = logging.getLogger(__app__)
 
@@ -64,8 +61,8 @@ def connect(username, password):
     """
     vk_session = vk_api.VkApi(login=username, password=password)
     try:
-        vk_session.authorization()
-    except vk_api.AuthorizationError as error_msg:
+        vk_session.auth()
+    except vk_api.AuthError as error_msg:
         sys.exit(error_msg)
 
     return vk_session

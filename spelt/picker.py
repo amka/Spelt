@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # coding: utf-8
 
 # This code is available for use under CC0 (Creative Commons 0 - universal).
@@ -16,7 +16,7 @@
 # cancel returns False
 
 import curses
-import curses.wrapper
+from curses import wrapper
 import locale
 
 locale.setlocale(locale.LC_ALL, "")
@@ -93,7 +93,7 @@ class Picker(object):
             return False
 
         ret_s = filter(lambda x: x["selected"], self.all_options)
-        return map(lambda x: x["label"], ret_s)
+        return list(map(lambda x: x["label"], ret_s))
 
     def redraw(self):
         self.win.clear()
