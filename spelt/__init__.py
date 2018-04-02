@@ -47,6 +47,11 @@ def init_logger():
     logger.setLevel(logging.INFO)
 
 
+def tfa_handler():
+    temporary_code = input('Code: ')
+    return temporary_code, False # Never remember temporary code.
+
+
 def connect(username, password):
     """Try to connect to VK.com and authenticate with given credentials.
     If it's OK return instance of :class:`vk_api.VkApi`.
@@ -59,7 +64,8 @@ def connect(username, password):
     :return: None of :class:`vk_api.VkApi`
     :rtype: None or :class:`vk_api.VkApi`
     """
-    vk_session = vk_api.VkApi(login=username, password=password)
+    vk_session = vk_api.VkApi(login=username, password=password,
+            auth_handler=tfa_handler)
     try:
         vk_session.auth()
     except vk_api.AuthError as error_msg:
