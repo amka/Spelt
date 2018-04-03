@@ -16,5 +16,6 @@ setup(
     install_requires=[
         'requests',
         'vk-api',
+        'piexif'
     ],
 )
