@@ -136,18 +136,19 @@ def get_album_photos(album, offset, vk_session):
         logging.error(e)
         return items
 
+    image_types = {'s':0, 'm':1, 'x': 2, 'o':3, 'p': 4, 'q': 5, 'r': 6, 'y': 7, 'z': 8, 'w': 9}
     if 'items' in response:
         for item in response['items']:
+            sizes = item.get('sizes')
+            if len(sizes)==0:
+                logging.info('Item skipped!')
+                continue
+            newlist = sorted(sizes, key=lambda x: image_types.get(x.get('type')), reverse=True)
             image = {
                 'id': item['id'],
                 'date': datetime.datetime.fromtimestamp(item['date']),
                 'url':
-                    item.get('photo_2560') or
-                    item.get('photo_1280') or
-                    item.get('photo_807') or
-                    item.get('photo_604') or
-                    item.get('photo_130') or
-                    item.get('photo_75')
+                    newlist[0].get('url')
             }
             if item.get('text'):
                 image['title'] = normpath(item['text'])
