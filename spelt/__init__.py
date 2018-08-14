@@ -11,6 +11,7 @@
 import datetime
 import logging
 import logging.config
+import piexif
 import sys
 from argparse import ArgumentParser
 from functools import partial
@@ -47,6 +48,11 @@ def init_logger():
     logger.setLevel(logging.INFO)
 
 
+def tfa_handler():
+    temporary_code = input('Code: ')
+    return temporary_code, False # Never remember temporary code.
+
+
 def connect(username, password):
     """Try to connect to VK.com and authenticate with given credentials.
     If it's OK return instance of :class:`vk_api.VkApi`.
@@ -59,7 +65,8 @@ def connect(username, password):
     :return: None of :class:`vk_api.VkApi`
     :rtype: None or :class:`vk_api.VkApi`
     """
-    vk_session = vk_api.VkApi(login=username, password=password)
+    vk_session = vk_api.VkApi(login=username, password=password,
+            auth_handler=tfa_handler)
     try:
         vk_session.auth()
     except vk_api.AuthError as error_msg:
@@ -158,6 +165,25 @@ def get_album_photos(album, offset, vk_session):
     return items
 
 
+def generate_exif(photo):
+    """Generates binary metadata (creation time) for an image.
+    :param photo: dict containing vk photo description.
+    :return: binary data to be inserted into an image file.
+    """
+    zeroth, exif, gps = {}, {}, {}
+
+    if photo['date']:
+        creation_time = photo['date'].strftime("%Y:%m:%d %H:%M:%S")
+
+        exif[piexif.ExifIFD.DateTimeOriginal] = unicode(creation_time)
+
+        zeroth[piexif.ImageIFD.Make] = "Imported from VK"
+
+    exif_bytes = piexif.dump({"0th": zeroth, "Exif": exif, "GPS": gps})
+
+    return exif_bytes
+
+
 def download_photo(output, photo):
     """Download single image from VK.com to given folder.
     `photo` objects have to be similar to:
@@ -193,7 +219,7 @@ def download_photo(output, photo):
             for chunk in r.iter_content(8192):
                 fd.write(chunk)
         logger.debug('Downloaded photo: %s', photo_filename)
-
+        piexif.insert(generate_exif(photo), photo_filename)
     except Exception as e:
         logger.exception(e)
         return 0
