@@ -14,12 +14,12 @@ import logging.config
 import sys
 from argparse import ArgumentParser
 from functools import partial
-from getpass import getpass
 from multiprocessing import Pool
 from os import mkdir, path, getcwd
 
 import requests
 import vk_api
+from getpass import getpass
 
 from spelt.picker import Picker
 
@@ -27,8 +27,11 @@ USER_PHOTOS_ALBUM_ID = -9999999
 
 __app__ = 'Spelt'
 __author__ = 'Andrey Maksimov <meamka@ya.ru>'
-__date__ = '15.01.18'
-__version__ = '0.2'
+__date__ = '20.08.18'
+__version__ = '0.3'
+
+# Detect default input command
+input_command = input if sys.version_info.major >= 3 else raw_input
 
 logger = logging.getLogger(__app__)
 
@@ -40,7 +43,8 @@ def init_logger():
     """
     ch = logging.StreamHandler()
 
-    formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)-8s]  %(message)s')
+    formatter = logging.Formatter(
+        '[%(asctime)s][%(name)s][%(levelname)-8s]  %(message)s')
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
@@ -79,8 +83,10 @@ def get_albums(vk_session):
     try:
         vk_response = vk_session.method(
             'photos.getAlbums',
-            values={'owner_id': vk_session.token['user_id'], 'need_system': 1}
-        )
+            values={
+                'owner_id': vk_session.token['user_id'],
+                'need_system': 1
+            })
         return vk_response['items']
     except Exception:
         logging.info("Couldn't get albums. Sorry.")
@@ -97,9 +103,12 @@ def get_user_photos_album(vk_session):
         """
     vk_response = vk_session.method(
         'photos.getUserPhotos',
-        values={'user_id': vk_session.token['user_id']}
-    )
-    return {'title': 'Photos with me', 'id': USER_PHOTOS_ALBUM_ID, 'size': vk_response['count']}
+        values={'user_id': vk_session.token['user_id']})
+    return {
+        'title': 'Photos with me',
+        'id': USER_PHOTOS_ALBUM_ID,
+        'size': vk_response['count']
+    }
 
 
 def get_album_photos(album, offset, vk_session):
@@ -116,39 +125,59 @@ def get_album_photos(album, offset, vk_session):
 
     def normpath(filename):
         keepcharacters = [' ', '.', '_', ',']
-        return "".join(c for c in filename if c.isalnum() or c in keepcharacters).rstrip()
+        return "".join(c for c in filename
+                       if c.isalnum() or c in keepcharacters).rstrip()
 
     items = []
     try:
         if USER_PHOTOS_ALBUM_ID == album['id']:
-            response = vk_session.method('photos.getUserPhotos', values={
-                'user_id': vk_session.token['user_id'],
-                'count': 1000,
-                'offset': offset or 0
-            })
+            response = vk_session.method(
+                'photos.getUserPhotos',
+                values={
+                    'user_id': vk_session.token['user_id'],
+                    'count': 1000,
+                    'offset': offset or 0,
+                    'photo_sizes': 1
+                })
         else:
-            response = vk_session.method('photos.get', values={
-                'owner_id': vk_session.token['user_id'],
-                'album_id': album['id'],
-                'offset': offset or 0
-            })
+            response = vk_session.method(
+                'photos.get',
+                values={
+                    'owner_id': vk_session.token['user_id'],
+                    'album_id': album['id'],
+                    'offset': offset or 0,
+                    'photo_sizes': 1
+                })
     except Exception as e:
         logging.error(e)
         return items
 
-    image_types = {'s':0, 'm':1, 'x': 2, 'o':3, 'p': 4, 'q': 5, 'r': 6, 'y': 7, 'z': 8, 'w': 9}
+    image_types = {
+        's': 0,
+        'm': 1,
+        'x': 2,
+        'o': 3,
+        'p': 4,
+        'q': 5,
+        'r': 6,
+        'y': 7,
+        'z': 8,
+        'w': 9
+    }
     if 'items' in response:
         for item in response['items']:
             sizes = item.get('sizes')
-            if len(sizes)==0:
+            if not sizes:
                 logging.info('Item skipped!')
                 continue
-            newlist = sorted(sizes, key=lambda x: image_types.get(x.get('type')), reverse=True)
+            newlist = sorted(
+                sizes,
+                key=lambda x: image_types.get(x.get('type')),
+                reverse=True)
             image = {
                 'id': item['id'],
                 'date': datetime.datetime.fromtimestamp(item['date']),
-                'url':
-                    newlist[0].get('url')
+                'url': newlist[0].get('url')
             }
             if item.get('text'):
                 image['title'] = normpath(item['text'])
@@ -176,17 +205,20 @@ def download_photo(output, photo):
     """
 
     # to keep neuteral order and avoid overwriting when few photos have the same description
-    basename = u'%s%s' % (photo['id'],  u'_' + photo.get('title') if photo.get('title') else '')
+    basename = u'%s%s' % (photo['id'], u'_' + photo.get('title')
+                          if photo.get('title') else '')
     # Filesystem naming limitation to avoid error 255 bytes for ext3,ext4
     if sys.getsizeof(basename) > 245:
         basename = photo['id']
 
-    target_filename = escape_path(u'%s%s' % (basename, path.splitext(photo['url'])[1]))
+    target_filename = escape_path(
+        u'%s%s' % (basename, path.splitext(photo['url'])[1]))
     photo_filename = path.join(output, target_filename)
     if path.isfile(photo_filename):
         logger.debug(u'Image %s already exist. Skipped.', basename)
         return 1
-    logger.debug(u'Begin download image %s to %s', photo['url'], photo_filename)
+    logger.debug(u'Begin download image %s to %s', photo['url'],
+                 photo_filename)
     try:
         r = requests.get(photo['url'], stream=True)
         with open(photo_filename, 'wb') as fd:
@@ -218,7 +250,8 @@ def process_albums(albums, output, vk_session):
 
         logger.debug('Album Size: %s', album['size'])
         while offset <= album['size']:
-            photo_urls = get_album_photos(album=album, offset=offset, vk_session=vk_session)
+            photo_urls = get_album_photos(
+                album=album, offset=offset, vk_session=vk_session)
             logger.debug('Got URLs for %s photo(s)', len(photo_urls))
 
             f = partial(download_photo, album_folder)
@@ -230,9 +263,12 @@ def process_albums(albums, output, vk_session):
 
             offset += 1000
 
-        logger.info(u'Album "%s" [%d] downloaded.', album['title'], album['size'])
+        logger.info(u'Album "%s" [%d] downloaded.', album['title'],
+                    album['size'])
 
-    logger.info('%d photo(s) downloaded.' % sum([album['size'] for album in albums]))
+    logger.info(
+        '%d photo(s) downloaded.' % sum([album['size'] for album in albums]))
+
 
 def escape_path(path):
     if path:
@@ -250,14 +286,18 @@ def run_app():
     arg_parser = ArgumentParser(
         prog=__app__,
         description='Spelt is a small python application aimed to allow users '
-                    'to backup their photo from https://vk.com to local storage',
+        'to backup their photo from https://vk.com to local storage',
     )
 
     arg_parser.add_argument('--username', '-U', help='vk.com username')
     arg_parser.add_argument('--password', '-P', help='vk.com password')
-    arg_parser.add_argument('--output', '-O', help='output path to store photos. Defaults to current directory.',
-                            default=path.abspath(path.join(getcwd(), 'Spelt')))
-    arg_parser.add_argument('--verbose', help='enable verbose mode', action='store_true')
+    arg_parser.add_argument(
+        '--output',
+        '-O',
+        help='output path to store photos. Defaults to current directory.',
+        default=path.abspath(path.join(getcwd(), 'Spelt')))
+    arg_parser.add_argument(
+        '--verbose', help='enable verbose mode', action='store_true')
 
     args = arg_parser.parse_args()
 
@@ -280,7 +320,7 @@ def run_app():
     start_time = datetime.datetime.now()
 
     try:
-        username = args.username or raw_input('Username: ')
+        username = args.username or input_command('Username: ')
         password = args.password or getpass("Password (hidden): ")
 
         if not username or not password:
@@ -293,9 +333,10 @@ def run_app():
 
         selected_albums_titles = Picker(
             title='Select Albums to Process',
-            options=[u'%-45s %5d [ID:%d]' % (album['title'], album['size'], album['id']) for album
-                     in albums]
-        ).get_selected()
+            options=[
+                u'%-45s %5d [ID:%d]' % (album['title'], album['size'],
+                                        album['id']) for album in albums
+            ]).get_selected()
 
         if not selected_albums_titles:
             logger.info('Nothing to export')
@@ -307,10 +348,14 @@ def run_app():
             selected_albums_ids.append(id_)
             logger.debug('Adds %s to selection', id_)
 
-        selected_albums = [album for album in albums if album['id'] in selected_albums_ids]
-        logger.debug(u'Selected Albums: %s' % [u'%s' % album['title'] for album in selected_albums])
+        selected_albums = [
+            album for album in albums if album['id'] in selected_albums_ids
+        ]
+        logger.debug(u'Selected Albums: %s' %
+                     [u'%s' % album['title'] for album in selected_albums])
 
-        process_albums(albums=selected_albums, output=args.output, vk_session=vk_session)
+        process_albums(
+            albums=selected_albums, output=args.output, vk_session=vk_session)
 
     except KeyboardInterrupt:
         logger.info('Stopped by keyboard')
