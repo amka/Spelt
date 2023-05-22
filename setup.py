@@ -19,7 +19,7 @@ setuptools.setup(
     },
     packages=setuptools.find_packages(),
     install_requires=[
-        'requests==2.20.0',
+        'requests==2.31.0',
         'vk-api==11.0.0',
     ],
     classifiers=[
