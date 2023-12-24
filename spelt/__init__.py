@@ -145,6 +145,7 @@ def get_album_photos(album, offset, vk_session):
                 values={
                     'owner_id': vk_session.token['user_id'],
                     'album_id': album['id'],
+                    'count': 1000,
                     'offset': offset or 0,
                     'photo_sizes': 1
                 })
@@ -212,7 +213,7 @@ def download_photo(output, photo):
         basename = photo['id']
 
     target_filename = escape_path(
-        u'%s%s' % (basename, path.splitext(photo['url'])[1]))
+        u'%s%s' % (basename, path.splitext(photo['url'].split('?')[0])[1]))
     photo_filename = path.join(output, target_filename)
     if path.isfile(photo_filename):
         logger.debug(u'Image %s already exist. Skipped.', basename)

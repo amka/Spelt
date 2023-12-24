@@ -20,7 +20,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'requests==2.31.0',
-        'vk-api==11.0.0',
+        'vk-api==11.9.9',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
